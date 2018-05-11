@@ -47,21 +47,11 @@ impl Future for Server {
 
     fn poll(&mut self) -> Poll<(), io::Error> {
         loop {
-            // First we check to see if there's a message we need to echo back.
-            // If so then we try to send it back to the original source, waiting
-            // until it's writable and we're able to do so.
-            // if let Async::Ready((size, peer)) = self.to_send {
-            //     let amt = self.socket.poll_send_to(&self.buf[..size], &peer).unwrap();
-            //     // println!("Echoed {}/{} bytes to {}", amt, size, peer);
-            //     self.to_send = Async::NotReady;
-            // }
-
-            // If we're here then `to_send` is `None`, so we take a look for the
-            // next message we're going to echo back.
             match self.socket.poll_recv_from(&mut self.buf)? {
                 Async::Ready((size, peer)) => {
                     println!("Received {} bytes from {}", size, peer);
 
+                    //TODO: make tcp request to doh-server, parse reult, reply like shown here
                     let amt = self.socket.poll_send_to(&self.buf[..size], &peer)?;
                     println!("Echoed {:?}/{} bytes to {}", amt, size, peer);
                 },
@@ -79,14 +69,12 @@ fn main() {
 
     //udp sockets should be rebindable, right?
     let socket = UdpSocket::bind(&addr).unwrap();
-    let socket_cloned = UdpSocket::bind(&addr).unwrap();
-
 
     println!("Listening on: {}", socket.local_addr().unwrap());
 
     let server = Server {
         socket: socket,
-        buf: vec![0; 1024],
+        buf: vec![0; 1500],
     };
 
 
