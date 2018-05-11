@@ -61,6 +61,9 @@ impl Future for Server {
             match self.socket.poll_recv_from(&mut self.buf)? {
                 Async::Ready((size, peer)) => {
                     println!("Received {} bytes from {}", size, peer);
+
+                    let amt = self.socket.poll_send_to(&self.buf[..size], &peer)?;
+                    println!("Echoed {:?}/{} bytes to {}", amt, size, peer);
                 },
                 Async::NotReady => { },
             }
