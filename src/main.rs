@@ -42,8 +42,8 @@ impl Future for Server {
     fn poll(&mut self) -> Poll<(), io::Error> {
         loop {
             match self.tokio_socket.poll_recv_from(&mut self.buf)? {
-                Async::Ready((size, peer)) => {
-                    handle_packet(self, size, peer)?;
+                Async::Ready((amt, scr_addr)) => {
+                    handle_packet(self, amt, scr_addr)?;
                 },
                 Async::NotReady => { },
             }
@@ -51,15 +51,21 @@ impl Future for Server {
     }
 }
 
-fn handle_packet(server: &mut Server, size: usize, peer: SocketAddr) -> Result<(), io::Error> {
-    println!("Received {} bytes from {}", size, peer);
+fn handle_packet(server: &mut Server, amt: usize, src_addr: SocketAddr) -> Result<(), io::Error> {
+    println!("Received {} bytes from {}", amt, src_addr);
 
     //TODO: make tcp request to doh-server, parse reult, reply in new thread on the server socket.
     //clone it again with try_clone if necessary for lifetime requirements!
 
-    //TODO: remove this:
-    let amt = server.tokio_socket.poll_send_to(&server.buf[..size], &peer)?;
-    println!("Echoed {:?}/{} bytes to {}", amt, size, peer);
+    let socket = server.socket.try_clone()?;
+    let buf = &mut server.buf[..amt]; //clones this buffer
+    server.threadpool.install(move || {
+        match socket.send_to(buf, &src_addr) {
+            Ok(_) => { println!("Echoed {:?}/{} bytes to {}", amt, amt, src_addr); },
+            Err(_) => { println!("Failed to send {:?}/{} bytes to {}", amt, amt, src_addr); },
+
+        } ;
+    });
 
     Ok(())
 }
@@ -77,6 +83,7 @@ fn main() -> std::io::Result<()> {
 
     let mut runtime = Runtime::new().unwrap();
 
+    //0 causes the build to either use the cpu count or the RAYON_NUM_THREADS environment variable
     let pool = rayon::ThreadPoolBuilder::new().num_threads(0).build().unwrap();
 
     let addr = "127.0.0.1:6142".parse().unwrap();
