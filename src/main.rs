@@ -64,8 +64,8 @@ fn handle_packet(server: &mut Server, amt: usize, src_addr: SocketAddr) -> Resul
     println!("Received {} bytes from {}", amt, src_addr);
 
     //TODO: make tcp request to doh-server, parse reult, reply in new thread on the server socket.
-    //clone it again with try_clone if necessary for lifetime requirements!
 
+    //clone it again with try_clone for lifetime requirements!
     let socket = server.socket.try_clone()?;
     let buf = server.buf.clone(); //clones this buffer
     server.threadpool.install(move || {
