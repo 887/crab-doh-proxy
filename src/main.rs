@@ -7,14 +7,16 @@
 extern crate tokio;
 
 extern crate serde;
-extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
 
 extern crate rayon;
 
+extern crate dns_parser;
+
 use std::io::prelude::*;
-use std::{env};
+use std::env;
 use std::net::{SocketAddr, UdpSocket};
 use std::io::{self, Write};
 
@@ -26,9 +28,11 @@ use tokio::runtime::Runtime;
 
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
+use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Type};
+
 mod dns;
 
-struct Server{
+struct Server {
     threadpool: ThreadPool,
     socket: UdpSocket,
     tokio_socket: TokioUdpSocket,
@@ -44,11 +48,16 @@ impl Future for Server {
             match self.tokio_socket.poll_recv_from(&mut self.buf)? {
                 Async::Ready((amt, scr_addr)) => {
                     handle_packet(self, amt, scr_addr)?;
-                },
-                Async::NotReady => { },
+                }
+                Async::NotReady => {}
             }
         }
     }
+}
+
+struct RequestSource {
+    socket: UdpSocket,
+    src_addr: SocketAddr,
 }
 
 fn handle_packet(server: &mut Server, amt: usize, src_addr: SocketAddr) -> Result<(), io::Error> {
@@ -58,19 +67,35 @@ fn handle_packet(server: &mut Server, amt: usize, src_addr: SocketAddr) -> Resul
     //clone it again with try_clone if necessary for lifetime requirements!
 
     let socket = server.socket.try_clone()?;
-    let buf = &mut server.buf[..amt]; //clones this buffer
+    let buf = server.buf.clone(); //clones this buffer
     server.threadpool.install(move || {
-        match socket.send_to(buf, &src_addr) {
-            Ok(_) => { println!("Echoed {:?}/{} bytes to {}", amt, amt, src_addr); },
-            Err(_) => { println!("Failed to send {:?}/{} bytes to {}", amt, amt, src_addr); },
-
-        } ;
+        parse_packet(socket, buf, src_addr);
     });
 
     Ok(())
 }
 
-fn get_sockets(adr: SocketAddr, reactor_handle: &tokio::reactor::Handle) -> std::io::Result<(UdpSocket, TokioUdpSocket)> {
+fn parse_packet(socket: UdpSocket, buf: Vec<u8>, src_addr: SocketAddr) {
+    let rs = RequestSource {socket: socket, src_addr: src_addr};
+    send_response(rs, buf);
+}
+
+fn send_response(rs: RequestSource, buf: Vec<u8>) {
+    let amt = buf.len();
+    match rs.socket.send_to(&buf, &rs.src_addr) {
+        Ok(_) => {
+            println!("Echoed {:?}/{} bytes to {}", amt, amt, rs.src_addr);
+        }
+        Err(_) => {
+            println!("Failed to send {:?}/{} bytes to {}", amt, amt, rs.src_addr);
+        }
+    };
+}
+
+fn get_sockets(
+    adr: SocketAddr,
+    reactor_handle: &tokio::reactor::Handle,
+) -> std::io::Result<(UdpSocket, TokioUdpSocket)> {
     let socket = std::net::UdpSocket::bind(adr)?;
     let socket_for_later = socket.try_clone()?;
     println!("Listening on: {}", socket.local_addr().unwrap());
@@ -84,10 +109,13 @@ fn main() -> std::io::Result<()> {
     let mut runtime = Runtime::new().unwrap();
 
     //0 causes the build to either use the cpu count or the RAYON_NUM_THREADS environment variable
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(0).build().unwrap();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(0)
+        .build()
+        .unwrap();
 
     let addr = "127.0.0.1:6142".parse().unwrap();
-    let (udp_socket,tokio_socket) = get_sockets(addr, runtime.reactor())?;
+    let (udp_socket, tokio_socket) = get_sockets(addr, runtime.reactor())?;
     let server = Server {
         threadpool: pool,
         tokio_socket: tokio_socket,

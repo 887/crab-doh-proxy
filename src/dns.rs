@@ -2,53 +2,53 @@
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Question {
-    #[serde(rename="name")]
+    #[serde(rename = "name")]
     pub qname: String,
-    #[serde(rename="type")]
+    #[serde(rename = "type")]
     pub qtype: u16,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Answer {
-    #[serde(rename="name")]
+    #[serde(rename = "name")]
     pub aname: String,
-    #[serde(rename="type")]
+    #[serde(rename = "type")]
     pub atype: u16,
-    #[serde(rename="TTL")]
+    #[serde(rename = "TTL")]
     pub ttl: u32,
     pub data: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Authority {
-    #[serde(rename="name")]
+    #[serde(rename = "name")]
     pub aname: String,
-    #[serde(rename="type")]
+    #[serde(rename = "type")]
     pub atype: u16,
-    #[serde(rename="TTL")]
+    #[serde(rename = "TTL")]
     pub ttl: u32,
     pub data: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Request {
-    #[serde(rename="Status")]
+    #[serde(rename = "Status")]
     pub status: u32,
-    #[serde(rename="TC")]
+    #[serde(rename = "TC")]
     pub tc: bool,
-    #[serde(rename="RD")]
+    #[serde(rename = "RD")]
     pub rd: bool,
-    #[serde(rename="RA")]
+    #[serde(rename = "RA")]
     pub ra: bool,
-    #[serde(rename="AD")]
+    #[serde(rename = "AD")]
     pub ad: bool,
-    #[serde(rename="CD")]
+    #[serde(rename = "CD")]
     pub cd: bool,
-    #[serde(rename="Question")]
+    #[serde(rename = "Question")]
     pub questions: Vec<Question>,
-    #[serde(rename="Answer")]
+    #[serde(rename = "Answer")]
     pub answers: Option<Vec<Answer>>,
-    #[serde(rename="Comment")]
+    #[serde(rename = "Comment")]
     pub comment: Option<String>,
 }
 
@@ -65,7 +65,8 @@ impl Answer {
             5 | 12 => {
                 let mut data: Vec<u8> = Vec::new();
                 let name = &self.data;
-                for label in name.split('.') { let size = label.len() as u8;
+                for label in name.split('.') {
+                    let size = label.len() as u8;
                     data.push(size);
                     data.extend(label.as_bytes());
                 }

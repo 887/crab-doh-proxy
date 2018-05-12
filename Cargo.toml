@@ -4,6 +4,7 @@ name = "crab-doh-proxy"
 version = "0.1.0"
 [dependencies]
 clap = "2.31.2"
+dns-parser = "0.7.1"
 futures = "0.2.1"
 rayon = "1.0.1"
 serde = "1.0.53"
