@@ -5,6 +5,11 @@
 
 #[macro_use]
 extern crate tokio;
+extern crate serde;
+extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
+
 
 use tokio::io;
 use tokio::prelude::*;
@@ -13,10 +18,13 @@ use std::net::SocketAddr;
 
 use std::{env};
 
+mod dns;
+
 struct Server {
     socket: UdpSocket,
     buf: Vec<u8>,
 }
+
 
 // fn main() {
 //     use tokio::net::TcpListener;
