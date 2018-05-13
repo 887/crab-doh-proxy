@@ -32,8 +32,9 @@ extern crate hyper_tls;
 
 mod dns;
 mod server;
-// mod https_connector;
 mod request;
+
+use std::sync::Arc;
 
 use std::io::prelude::*;
 use std::io::{self, Write};
@@ -63,6 +64,22 @@ fn get_sockets(
     Ok((socket_for_later, tokio_socket))
 }
 
+fn spawn_server (addr: &str, runtime: &mut Runtime, boxed_pool: Arc<ThreadPool>) -> std::io::Result<()> {
+    let addr = addr.parse().unwrap();
+    let (udp_socket, tokio_socket) = get_sockets(addr, runtime.reactor())?;
+    let server = Server {
+        threadpool: boxed_pool,
+        tokio_socket: tokio_socket,
+        socket: udp_socket,
+        buf: vec![0; 1500],
+    };
+
+    let server = server.map_err(|e| println!("server error = {:?}", e));
+    runtime.spawn(server);
+
+    Ok(())
+}
+
 fn main() -> std::io::Result<()> {
     simple_logger::init_with_level(log::Level::Debug).unwrap();
 
@@ -73,18 +90,23 @@ fn main() -> std::io::Result<()> {
                 .num_threads(0)
                 .build()
                 .unwrap();
+    let pool = Arc::new(pool);
 
-    let addr = "127.0.0.1:6142".parse().unwrap();
-    let (udp_socket, tokio_socket) = get_sockets(addr, runtime.reactor())?;
-    let server = Server {
-        threadpool: pool,
-        tokio_socket: tokio_socket,
-        socket: udp_socket,
-        buf: vec![0; 1500],
-    };
+    //TODO: read a https over dns target from clap, cloudflare as default and google as backup
+    //
+    //cloudlfare, also needs the content-type header for application/dns-json
+    //"1.1.1.1" ,1.0.0.1, dns.cloudflare.com
+    // -> /dns-query?{name}{type}
+    //
+    //or the good old google
+    //216.58.195.78, dns.google.com
+    // -> /resolve?{name}{type}
+    //
+    // step 2 is to check the certificate and certificate authority
 
-    let server = server.map_err(|e| println!("server error = {:?}", e));
-    runtime.spawn(server);
+    //TODO: parse list of listening addresses via clap and spawn a server for each like this
+    spawn_server("127.0.0.1:6142", &mut runtime, pool.clone())?;
+
     runtime.shutdown_on_idle().wait().unwrap();
 
     Ok(())

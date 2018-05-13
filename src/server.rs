@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use std::io::prelude::*;
 use std::io::{self, Write};
 use std::net::{UdpSocket};
@@ -10,7 +12,7 @@ use tokio::net::UdpSocket as TokioUdpSocket;
 use request::handle_request;
 
 pub struct Server {
-    pub threadpool: ThreadPool,
+    pub threadpool: Arc<ThreadPool>,
     pub socket: UdpSocket,
     pub tokio_socket: TokioUdpSocket,
     pub buf: Vec<u8>,

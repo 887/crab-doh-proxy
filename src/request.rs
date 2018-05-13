@@ -74,7 +74,7 @@ fn hyper_request() {
     // HTTPS requires picking a TLS implementation, so give a better
     // warning if the user tries to request an 'https' URL.
     let url = url.parse::<hyper::Uri>().unwrap();
-    if url.scheme_part().map(|s| s.as_ref()) != Some("http") {
+    if url.scheme_part().map(|s| s.as_ref()) != Some("https") {
         println!("This example only works with 'http' URLs.");
         return;
     }
@@ -115,6 +115,8 @@ fn make_request(rs: Source, packet: Packet) {
     //build_response
     // let addr = "127.0.0.1:6142".parse().unwrap();
     // let stream = addr.connect_async::<tokio_tls::TlsStream>();
+
+    hyper_request();
 
     let buf = vec![0;1500];
     send_response(rs, buf);
