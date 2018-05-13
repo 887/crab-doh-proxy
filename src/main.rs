@@ -80,7 +80,7 @@ fn spawn_server (addr: &str, runtime: &mut Runtime,
         buf: vec![0; 1500],
     };
 
-    let server = server.map_err(|e| println!("server error = {:?}", e));
+    let server = server.map_err(|e| error!("server error = {:?}", e));
     runtime.spawn(server);
 
     Ok(())
@@ -91,6 +91,7 @@ fn main() -> std::io::Result<()> {
 
     let mut runtime = Runtime::new().unwrap();
 
+    //TODO: make num-worker-threads an option read from the command line arguments via clap
     //0 causes the build to either use the cpu count or the RAYON_NUM_THREADS environment variable
     let pool = rayon::ThreadPoolBuilder::new()
                 .num_threads(0)
@@ -98,8 +99,9 @@ fn main() -> std::io::Result<()> {
                 .unwrap();
     let pool = Arc::new(pool);
 
-    //TODO: read a https over dns target from clap, cloudflare as default and google as backup
-
+    //TODO: read a doh resolver target from clap, cloudflare as default and google as backup
+    //Only let build-in resolvers be selectable, we don't need the mess that is  generic support
+    //for everything via user configuration.
     let config = Config::init_cloudflare();
     let config = Arc::new(config);
 
