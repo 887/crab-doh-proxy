@@ -12,7 +12,6 @@ use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Ty
 use futures::{future};
 
 // use tokio::prelude::*;
-
 // use tokio::prelude::Future as OtherFuture;
 
 use server::Server;
@@ -62,30 +61,60 @@ fn parse_packet(socket: UdpSocket, src_addr: SocketAddr, buf: Vec<u8>, amt: usiz
     }
 }
 
-fn make_request(rs: Source, packet: Packet) {
-    //build_response
-    // let addr = "127.0.0.1:6142".parse().unwrap();
-    // let stream = addr.connect_async::<tokio_tls::TlsStream>();
+fn hyper_request() {
+    // Some simple CLI args requirements...
+    let url = match env::args().nth(1) {
+        Some(url) => url,
+        None => {
+            println!("Usage: client <url>");
+            return;
+        }
+    };
 
-    tokio::run(lazy(|| {
+    // HTTPS requires picking a TLS implementation, so give a better
+    // warning if the user tries to request an 'https' URL.
+    let url = url.parse::<hyper::Uri>().unwrap();
+    if url.scheme_part().map(|s| s.as_ref()) != Some("http") {
+        println!("This example only works with 'http' URLs.");
+        return;
+    }
+
+    rt::run(rt::lazy(move || {
         let https = hyper_tls::HttpsConnector::new(4).unwrap();
         let client = hyper::Client::builder()
             .build::<_, hyper::Body>(https);
 
-        //887: problem here is that tokio::run is to new and requires
-        //tokio::prelude!!! responsefuture is of type future:future so that will never work!!
-        client.get("https://hyper.rs".parse().unwrap())
-                .and_then(|res| {
-                    println!("Status: {}", res.status());
-                    println!("Headers:\n{:#?}", res.headers());
-                    // res.into_body().for_each(|chunk| {
-                    //     ::std::io::stdout()
-                    //         .write_all(&chunk)
-                    //         .map_err(|e| panic!("example expects stdout to work: {}", e))
-                    // })
+        client
+            // Fetch the url...
+            .get(url)
+            // And then, if we get a response back...
+            .and_then(|res| {
+                println!("Response: {}", res.status());
+                println!("Headers: {:#?}", res.headers());
+
+                // The body is a stream, and for_each returns a new Future
+                // when the stream is finished, and calls the closure on
+                // each chunk of the body...
+                res.into_body().for_each(|chunk| {
+                    io::stdout().write_all(&chunk)
+                        .map_err(|e| panic!("example expects stdout is open, error={}", e))
                 })
-                .map_err(|e| println!("request error: {}", e))
+            })
+        // If all good, just tell the user...
+        .map(|_| {
+            println!("\n\nDone.");
+        })
+        // If there was an error, let the user know...
+        .map_err(|err| {
+            eprintln!("Error {}", err);
+        })
     }));
+}
+
+fn make_request(rs: Source, packet: Packet) {
+    //build_response
+    // let addr = "127.0.0.1:6142".parse().unwrap();
+    // let stream = addr.connect_async::<tokio_tls::TlsStream>();
 
     let buf = vec![0;1500];
     send_response(rs, buf);
