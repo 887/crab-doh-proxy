@@ -17,8 +17,8 @@ impl Config {
         info!("Google dns requires that this dns proxy isn't its own dns server!")
         info!("Google dns is https://dns.google.com/, so the system always needs to be able to resolve that,
               to use this proxy here.")
-        //side note: thats because their cert doesn't stretch over their Ips but only to *.google.com
-        //Lets hope they fix that.
+        //side note: thats because their cert doesn't stretch over their IPs (only to *.google.com)
+        //Lets hope they fix that one day.
         Config{
             resolver: Resolver::new_google()
         }
@@ -29,8 +29,8 @@ impl Config {
     //      //api.openresolve.com
     //      //same problem as google, their cert covers just the domain.
     //      //side node:
-    //      //We could implement using our own cert but that would make the code really
-    //      //no straight forward, for very little gained and hyper-tls isn't really build for that,
-    //      //as far as i can tell.
+    //      //We could implement to use our own cert, but that would make the code really
+    //      //no straight forward, for very little gained.
+    //      //Also hyper-tls isn't really build for that, as far as i can tell.
     // }
 }
