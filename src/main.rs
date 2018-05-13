@@ -33,6 +33,8 @@ extern crate hyper_tls;
 mod dns;
 mod server;
 mod request;
+mod resolver;
+mod config;
 
 use std::sync::Arc;
 
@@ -52,6 +54,7 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 use log::{SetLoggerError, LevelFilter};
 
 use server::Server;
+use config::Config;
 
 fn get_sockets(
     adr: SocketAddr,
@@ -64,11 +67,14 @@ fn get_sockets(
     Ok((socket_for_later, tokio_socket))
 }
 
-fn spawn_server (addr: &str, runtime: &mut Runtime, boxed_pool: Arc<ThreadPool>) -> std::io::Result<()> {
+fn spawn_server (addr: &str, runtime: &mut Runtime,
+                 pool: Arc<ThreadPool>, config: Arc<Config>) -> std::io::Result<()> {
+
     let addr = addr.parse().unwrap();
     let (udp_socket, tokio_socket) = get_sockets(addr, runtime.reactor())?;
     let server = Server {
-        threadpool: boxed_pool,
+        config: config,
+        threadpool: pool,
         tokio_socket: tokio_socket,
         socket: udp_socket,
         buf: vec![0; 1500],
@@ -93,19 +99,12 @@ fn main() -> std::io::Result<()> {
     let pool = Arc::new(pool);
 
     //TODO: read a https over dns target from clap, cloudflare as default and google as backup
-    //
-    //cloudlfare, also needs the content-type header for application/dns-json
-    //"1.1.1.1" ,1.0.0.1, dns.cloudflare.com
-    // -> /dns-query?{name}{type}
-    //
-    //or the good old google
-    //216.58.195.78, dns.google.com
-    // -> /resolve?{name}{type}
-    //
-    // step 2 is to check the certificate and certificate authority
+
+    let config = Config::init_cloudflare();
+    let config = Arc::new(config);
 
     //TODO: parse list of listening addresses via clap and spawn a server for each like this
-    spawn_server("127.0.0.1:6142", &mut runtime, pool.clone())?;
+    spawn_server("127.0.0.1:6142", &mut runtime, pool.clone(), config.clone())?;
 
     runtime.shutdown_on_idle().wait().unwrap();
 

@@ -11,7 +11,10 @@ use tokio::net::UdpSocket as TokioUdpSocket;
 
 use request::handle_request;
 
+use config::Config;
+
 pub struct Server {
+    pub config: Arc<Config>,
     pub threadpool: Arc<ThreadPool>,
     pub socket: UdpSocket,
     pub tokio_socket: TokioUdpSocket,

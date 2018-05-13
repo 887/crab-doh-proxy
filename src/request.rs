@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use std::io::{self, Write};
 use std::net::{SocketAddr, UdpSocket};
 use std::env;
@@ -11,10 +13,8 @@ use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Ty
 
 use futures::{future};
 
-// use tokio::prelude::*;
-// use tokio::prelude::Future as OtherFuture;
-
 use server::Server;
+use config::Config;
 
 use tokio;
 use hyper_tls;
@@ -32,15 +32,16 @@ pub fn handle_request(server: &mut Server, amt: usize, src_addr: SocketAddr) -> 
     let buf = server.buf[..amt].to_vec().clone(); //clones this buffer
     //clone it again with try_clone for lifetime requirements!
     let socket = server.socket.try_clone()?;
+    let config = server.config.clone();
     server.threadpool.install(move || {
-        parse_packet(socket, src_addr, buf, amt);
+        parse_packet(config, socket, src_addr, buf, amt);
     });
 
     Ok(())
 }
 
 
-fn parse_packet(socket: UdpSocket, src_addr: SocketAddr, buf: Vec<u8>, amt: usize) {
+fn parse_packet(config: Arc<Config>, socket: UdpSocket, src_addr: SocketAddr, buf: Vec<u8>, amt: usize) {
     //only print here in the thread, so we dont block stdio on the udp receiving thread
     debug!("Received {} bytes from {}", amt, src_addr);
     let rs = Source {socket: socket, src_addr: src_addr};
@@ -53,7 +54,7 @@ fn parse_packet(socket: UdpSocket, src_addr: SocketAddr, buf: Vec<u8>, amt: usiz
             error!("Invalid request from {}, packet questions != 1 (amt: {})", rs.src_addr, packet.questions.len());
         } else {
             debug!("packet parsed!");
-            make_request(rs, packet);
+            make_request(config, rs, packet);
             // handle_packet(config, cert, receiver, packet);
         }
     } else {
@@ -61,23 +62,16 @@ fn parse_packet(socket: UdpSocket, src_addr: SocketAddr, buf: Vec<u8>, amt: usiz
     }
 }
 
-fn hyper_request() {
-    // Some simple CLI args requirements...
-    let url = match env::args().nth(1) {
-        Some(url) => url,
-        None => {
-            println!("Usage: client <url>");
-            return;
-        }
-    };
+fn make_request(config: Arc<Config>, rs: Source, packet: Packet) {
+    //build_response
+    // let addr = "127.0.0.1:6142".parse().unwrap();
+    // let stream = addr.connect_async::<tokio_tls::TlsStream>();
 
-    // HTTPS requires picking a TLS implementation, so give a better
-    // warning if the user tries to request an 'https' URL.
-    let url = url.parse::<hyper::Uri>().unwrap();
-    if url.scheme_part().map(|s| s.as_ref()) != Some("https") {
-        println!("This example only works with 'http' URLs.");
-        return;
-    }
+    let qtype = packet.questions[0].qtype as u16;
+    let qname = packet.questions[0].qname.to_string();
+    info!("requested name:{}, type:{}", qname, qtype);
+
+    let url = config.resolver.get_url(qtype, &qname);
 
     rt::run(rt::lazy(move || {
         let https = hyper_tls::HttpsConnector::new(4).unwrap();
@@ -109,15 +103,9 @@ fn hyper_request() {
             eprintln!("Error {}", err);
         })
     }));
-}
 
-fn make_request(rs: Source, packet: Packet) {
-    //build_response
-    // let addr = "127.0.0.1:6142".parse().unwrap();
-    // let stream = addr.connect_async::<tokio_tls::TlsStream>();
-
-    hyper_request();
-
+    //TODO: move up to the client and and_then callback
+    //TODO: use build_response to build a real binary dns respone for the JSON packet
     let buf = vec![0;1500];
     send_response(rs, buf);
 }
