@@ -74,7 +74,8 @@ fn make_request(config: Arc<Config>, rs: Source, packet: Packet) {
     let url = config.resolver.get_url(qtype, &qname);
 
     rt::run(rt::lazy(move || {
-        let https = hyper_tls::HttpsConnector::new(4).unwrap();
+        let mut https = hyper_tls::HttpsConnector::new(1).unwrap();
+        https.force_https(true);
         let client = hyper::Client::builder()
             .build::<_, hyper::Body>(https);
 

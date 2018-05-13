@@ -25,9 +25,10 @@ impl Resolver {
             })
     }
     pub fn new_google() -> Self {
+
         Resolver::Google(
             GoogleResolver{
-                addr: "https://216.58.195.78/resolve?"
+                addr: "https://dns.google.com/resolve?"
             })
     }
 
@@ -44,10 +45,6 @@ impl Resolver {
                 resolver.addr.parse::<Uri>().unwrap()
             }
         }
-    }
-    pub fn check_cert() -> bool {
-        // TODO: check the certificate and certificate authority
-        true
     }
 }
 
