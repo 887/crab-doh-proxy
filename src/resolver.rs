@@ -18,6 +18,18 @@ pub enum Resolver {
 }
 
 impl Resolver {
+    pub fn new_cloudflare() -> Self {
+        Resolver::Cloudflare(
+            CloudflareResolver{
+                addr: "https://1.1.1.1/dns-query?"
+            })
+    }
+    pub fn new_google() -> Self {
+        Resolver::Google(
+            GoogleResolver{
+                addr: "https://216.58.195.78/resolve?"
+            })
+    }
 
     pub fn get_url(&self, _type: u16, name: &str) -> Uri {
         //TODO: take the name and type, put it in the url
@@ -36,21 +48,6 @@ impl Resolver {
     pub fn check_cert() -> bool {
         // TODO: check the certificate and certificate authority
         true
-    }
-}
-
-impl Resolver {
-    pub fn new_cloudflare() -> Self {
-        Resolver::Cloudflare(
-            CloudflareResolver{
-                addr: "https://1.1.1.1/dns-query?"
-            })
-    }
-    pub fn new_google() -> Self {
-        Resolver::Google(
-            GoogleResolver{
-                addr: "https://216.58.195.78/resolve?"
-            })
     }
 }
 
