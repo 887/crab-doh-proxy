@@ -46,6 +46,9 @@ fn parse_packet(config: Arc<Config>, socket: UdpSocket, src_addr: SocketAddr, bu
     debug!("Received {} bytes from {}", amt, src_addr);
     let rs = Source {socket: socket, src_addr: src_addr};
 
+    // TODO:
+    // if CONFIG_MOCK_REQUES_FOR_DEBUG
+
     // https://tailhook.github.io/dns-parser/dns_parser/struct.Packet.html
     if let Ok(packet) = Packet::parse(&buf) {
         // only support one question
@@ -73,7 +76,10 @@ fn make_request(config: Arc<Config>, rs: Source, packet: Packet) {
 
     let url = config.resolver.get_url(qtype, &qname);
 
-    rt::run(rt::lazy(move || {
+    //either run on the runtime..
+    //rt::run(rt::lazy(move || {
+    //or just wait one like here
+    let res = (rt::lazy(move || {
         let mut https = hyper_tls::HttpsConnector::new(1).unwrap();
         https.force_https(true);
         let client = hyper::Client::builder()
@@ -103,7 +109,11 @@ fn make_request(config: Arc<Config>, rs: Source, packet: Packet) {
         .map_err(|err| {
             eprintln!("Error {}", err);
         })
-    }));
+    })).wait();
+    match res {
+        Err(exit_status) => { error!("{:?}", exit_status);},
+        Ok(()) => {},
+    }
 
     //TODO: move up to the client and and_then callback
     //TODO: use build_response to build a real binary dns respone for the JSON packet

@@ -14,9 +14,9 @@ impl Config {
     }
 
     pub fn init_google() -> Self {
-        info!("Google dns requires that this dns proxy isn't its own dns server!")
+        info!("Google dns requires that this dns proxy isn't its own dns server!");
         info!("Google dns is https://dns.google.com/, so the system always needs to be able to resolve that,
-              to use this proxy here.")
+              to use this proxy here.");
         //side note: thats because their cert doesn't stretch over their IPs (only to *.google.com)
         //Lets hope they fix that one day.
         Config{
