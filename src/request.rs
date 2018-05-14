@@ -92,6 +92,11 @@ fn make_request(config: Arc<Config>, rs: Source, packet: Packet) {
                     tls_stream.read_to_end(&mut res).unwrap();
                     println!("{}", String::from_utf8_lossy(&res));
 
+                    //TODO: parse the http request (let try the http parser hyper uses, maybe?)
+                    //TODO: put it into json via serde
+                    //TODO: build a response with build_response to the packet and send it with
+                    //      send_response
+
                     let buf = vec![0;1500];
                     send_response(rs, buf);
                 },
