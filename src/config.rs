@@ -6,7 +6,6 @@ pub struct Config {
 
 impl Config {
     pub fn init_cloudflare() -> Self {
-        //cloudflares cert for their dns server covers 1.1.1.1 we are all good here
         Config{
             resolver: Resolver::new_cloudflare()
         }
@@ -14,11 +13,6 @@ impl Config {
     }
 
     pub fn init_google() -> Self {
-        info!("Google dns requires that this dns proxy isn't its own dns server!");
-        info!("Google dns is https://dns.google.com/, so the system always needs to be able to resolve that,
-              to use this proxy here.");
-        //side note: thats because their cert doesn't stretch over their IPs (only to *.google.com)
-        //Lets hope they fix that one day.
         Config{
             resolver: Resolver::new_google()
         }

@@ -24,11 +24,7 @@ extern crate log;
 extern crate env_logger;
 
 extern crate native_tls;
-extern crate tokio_tls;
 extern crate tokio_service;
-
-extern crate hyper;
-extern crate hyper_tls;
 
 mod dns;
 mod server;

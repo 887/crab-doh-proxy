@@ -1,11 +1,8 @@
 use std::sync::Arc;
 
-use std::io::{self, Write};
-use std::net::{SocketAddr, UdpSocket};
+use std::io::{self, Read, Write};
+use std::net::{SocketAddr, UdpSocket, TcpStream};
 use std::env;
-
-use hyper::Client;
-use hyper::rt::{self, Future, Stream, lazy};
 
 use rayon::{ThreadPool};
 
@@ -13,12 +10,10 @@ use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Ty
 
 use futures::{future};
 
+use native_tls::TlsConnector;
+
 use server::Server;
 use config::Config;
-
-use tokio;
-use hyper_tls;
-use hyper;
 
 struct Source {
     socket: UdpSocket,
@@ -34,20 +29,31 @@ pub fn handle_request(server: &mut Server, amt: usize, src_addr: SocketAddr) -> 
     let socket = server.socket.try_clone()?;
     let config = server.config.clone();
     server.threadpool.install(move || {
+        let buf = if amt < 14 {
+            mock_request()
+        } else {
+            buf
+        };
+
         parse_packet(config, socket, src_addr, buf, amt);
     });
 
     Ok(())
 }
 
+fn mock_request() -> Vec<u8> {
+    debug!("mocking request because length < 14");
+    let mut b = Builder::new_query(0, false);
+    b.add_question("google.com", QueryType::A, QueryClass::Any);
+    match b.build() {
+        Ok(data) | Err(data) => data,
+    }
+}
 
 fn parse_packet(config: Arc<Config>, socket: UdpSocket, src_addr: SocketAddr, buf: Vec<u8>, amt: usize) {
     //only print here in the thread, so we dont block stdio on the udp receiving thread
     debug!("Received {} bytes from {}", amt, src_addr);
     let rs = Source {socket: socket, src_addr: src_addr};
-
-    // TODO:
-    // if CONFIG_MOCK_REQUES_FOR_DEBUG
 
     // https://tailhook.github.io/dns-parser/dns_parser/struct.Packet.html
     if let Ok(packet) = Packet::parse(&buf) {
@@ -74,49 +80,22 @@ fn make_request(config: Arc<Config>, rs: Source, packet: Packet) {
     let qname = packet.questions[0].qname.to_string();
     info!("requested name:{}, type:{}", qname, qtype);
 
+
+    let connector = TlsConnector::builder().unwrap().build().unwrap();
+
+    let addr = config.resolver.get_addr();
+    let domain = config.resolver.get_domain();
+
+    let stream = TcpStream::connect(addr).unwrap();
+    let mut stream = connector.connect(domain, stream).unwrap();
+
     let url = config.resolver.get_url(qtype, &qname);
 
-    //either run on the runtime..
-    //rt::run(rt::lazy(move || {
-    //or just wait one like here
-    let res = (rt::lazy(move || {
-        let mut https = hyper_tls::HttpsConnector::new(1).unwrap();
-        https.force_https(true);
-        let client = hyper::Client::builder()
-            .build::<_, hyper::Body>(https);
+    stream.write_all(b"GET / HTTP/1.0\r\n\r\n").unwrap();
+    let mut res = vec![];
+    stream.read_to_end(&mut res).unwrap();
+    println!("{}", String::from_utf8_lossy(&res));
 
-        client
-            // Fetch the url...
-            .get(url)
-            // And then, if we get a response back...
-            .and_then(|res| {
-                println!("Response: {}", res.status());
-                println!("Headers: {:#?}", res.headers());
-
-                // The body is a stream, and for_each returns a new Future
-                // when the stream is finished, and calls the closure on
-                // each chunk of the body...
-                res.into_body().for_each(|chunk| {
-                    io::stdout().write_all(&chunk)
-                        .map_err(|e| panic!("example expects stdout is open, error={}", e))
-                })
-            })
-        // If all good, just tell the user...
-        .map(|_| {
-            println!("\n\nDone.");
-        })
-        // If there was an error, let the user know...
-        .map_err(|err| {
-            eprintln!("Error {}", err);
-        })
-    })).wait();
-    match res {
-        Err(exit_status) => { error!("{:?}", exit_status);},
-        Ok(()) => {},
-    }
-
-    //TODO: move up to the client and and_then callback
-    //TODO: use build_response to build a real binary dns respone for the JSON packet
     let buf = vec![0;1500];
     send_response(rs, buf);
 }
