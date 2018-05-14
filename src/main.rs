@@ -95,7 +95,9 @@ fn main() -> std::io::Result<()> {
     //TODO: read a doh resolver target from clap, cloudflare as default and google as backup
     //Only let build-in resolvers be selectable, we don't need the mess that is  generic support
     //for everything via user configuration.
+
     let config = Config::init_cloudflare();
+    // let config = Config::init_google();
     let config = Arc::new(config);
 
     //TODO: parse list of listening addresses via clap and spawn a server for each like this

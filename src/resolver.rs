@@ -24,8 +24,9 @@ impl Resolver {
     pub fn get_addr(&self) -> &'static str {
         match self {
             Resolver::Cloudflare() => {"1.1.1.1:443"},
-            //TODO: try with 216.58.195.78:443 and check if this really breaks https
-            Resolver::Google() => {"dns.google.com:443"}
+            Resolver::Google() => {"216.58.195.78:443"}
+            // Resolver::Google() => {"dns.google.com:443"} // this requires the proxy not to be
+            // its own dns server
         }
     }
 
@@ -51,8 +52,8 @@ impl Resolver {
             //TODO: parse from packet
             //&edns_client_subnet = edns
 
-            Resolver::Cloudflare() => {"&ct=application/dns-json"},
-            Resolver::Google() => {""}
+            Resolver::Cloudflare() => {"&dnssec=true&ct=application/dns-json"},
+            Resolver::Google() => {"&dnssec=true"}
         }
     }
 
@@ -75,7 +76,7 @@ impl Resolver {
     }
 
     pub fn get_request(&self, _type: u16, name: &str) -> String {
-        format!("GET {}?name={}&type={}&dnssec=true{} HTTP/1.0\r\nHost: \
+        format!("GET {}?name={}&type={}{} HTTP/1.0\r\nHost: \
                 {}{}\r\n\r\n",
                 self.get_dir(),
                 name,
