@@ -4,8 +4,6 @@
 #![allow(dead_code)]
 //#![allow(unreachable_code)]
 
-extern crate futures;
-
 #[macro_use]
 extern crate tokio;
 
@@ -24,7 +22,6 @@ extern crate log;
 extern crate env_logger;
 
 extern crate native_tls;
-extern crate tokio_service;
 
 mod dns;
 mod server;

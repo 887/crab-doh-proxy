@@ -6,7 +6,6 @@ version = "0.1.0"
 clap = "2.31.2"
 dns-parser = "0.7.1"
 env_logger = "0.5.10"
-futures = "0.2.1"
 log = "0.4.1"
 native-tls = "0.1.5"
 rayon = "1.0.1"
@@ -15,11 +14,5 @@ serde_derive = "1.0.54"
 serde_json = "1.0.17"
 simple_logger = "0.5.0"
 tokio = "0.1.6"
-tokio-service = "0.1.0"
-tokio-tls = { version = "0.1.4", default-features = false }
-
-[dependencies.hyper]
-git = "https://github.com/hyperium/hyper"
-
-[dependencies.hyper-tls]
-git = "https://github.com/hyperium/hyper-tls/"
+[features]
+mock_request = []

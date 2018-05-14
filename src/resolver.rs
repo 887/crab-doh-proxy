@@ -24,7 +24,8 @@ impl Resolver {
     pub fn get_addr(&self) -> &'static str {
         match self {
             Resolver::Cloudflare() => {"1.1.1.1:443"},
-            Resolver::Google() => {"216.58.195.78:443"}
+            //TODO: try with 216.58.195.78:443 and check if this really breaks https
+            Resolver::Google() => {"dns.google.com:443"}
         }
     }
 
@@ -38,10 +39,30 @@ impl Resolver {
         }
     }
 
-    fn get_doh(&self) -> &'static str {
+    pub fn get_dir(&self) -> &'static str {
         match self {
-            Resolver::Cloudflare() => {"https://1.1.1.1/dns-query?"},
-            Resolver::Google() => {"https://dns.google.com/resolve?"}
+            Resolver::Cloudflare() => {"/dns-query"},
+            Resolver::Google() => {"/resolve"}
+        }
+    }
+
+    fn get_additional_params(&self) -> &'static str {
+        match self {
+            //TODO: parse from packet
+            //&edns_client_subnet = edns
+
+            Resolver::Cloudflare() => {"&ct=application/dns-json"},
+            Resolver::Google() => {""}
+        }
+    }
+
+    fn get_headers(&self) -> &'static str {
+        let pad_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
+        match self {
+            //TODO: insert a random header here to pad the request and
+            // \r\nPadding: random_string_on_every_request
+            Resolver::Cloudflare() => {""},
+            Resolver::Google() => {""}
         }
     }
 
@@ -50,7 +71,18 @@ impl Resolver {
         // https://developers.google.com/speed/public-dns/docs/dns-over-https
         // let request = format!("GET /resolve?name={}&type={}&dnssec=true HTTP/1.0\r\nHost: \
 
-        self.get_doh()
+        self.get_dir()
+    }
+
+    pub fn get_request(&self, _type: u16, name: &str) -> String {
+        format!("GET {}?name={}&type={}&dnssec=true{} HTTP/1.0\r\nHost: \
+                {}{}\r\n\r\n",
+                self.get_dir(),
+                name,
+                _type,
+                self.get_additional_params(),
+                self.get_domain(),
+                self.get_headers())
     }
 }
 

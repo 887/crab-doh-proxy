@@ -9,9 +9,9 @@ use rayon::{ThreadPool};
 use tokio::prelude::*;
 use tokio::net::UdpSocket as TokioUdpSocket;
 
-use request::handle_request;
-
 use config::Config;
+
+use request::handle_request;
 
 pub struct Server {
     pub config: Arc<Config>,

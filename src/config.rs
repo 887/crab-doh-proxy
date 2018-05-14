@@ -13,6 +13,11 @@ impl Config {
     }
 
     pub fn init_google() -> Self {
+        info!("Google dns requires that this dns proxy isn't its own dns server!");
+        info!("Google dns is https://dns.google.com/, so the system always needs to be able to resolve that");
+        //side note: thats because their cert doesn't stretch over their IPs (only to *.google.com)
+        //Lets hope they fix that one day. TODO: this might not be a problem with with native tls
+        //anymore. Test with Ip.
         Config{
             resolver: Resolver::new_google()
         }

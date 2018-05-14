@@ -8,8 +8,6 @@ use rayon::{ThreadPool};
 
 use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Type};
 
-use futures::{future};
-
 use native_tls::TlsConnector;
 
 use server::Server;
@@ -21,19 +19,12 @@ struct Source {
 }
 
 pub fn handle_request(server: &mut Server, amt: usize, src_addr: SocketAddr) -> Result<(), io::Error> {
-    //TODO: make tcp request to doh-server, parse reult, reply in new thread on the server socket.
-
     //only clone the bytes we really need
-    let buf = server.buf[..amt].to_vec().clone(); //clones this buffer
-    //clone it again with try_clone for lifetime requirements!
+    let mut buf = server.buf[..amt].to_vec().clone();
     let socket = server.socket.try_clone()?;
     let config = server.config.clone();
     server.threadpool.install(move || {
-        let buf = if amt < 14 {
-            mock_request()
-        } else {
-            buf
-        };
+        buf = mock_request(buf, &amt);
 
         parse_packet(config, socket, src_addr, buf, amt);
     });
@@ -41,7 +32,16 @@ pub fn handle_request(server: &mut Server, amt: usize, src_addr: SocketAddr) -> 
     Ok(())
 }
 
-fn mock_request() -> Vec<u8> {
+#[cfg(not(feature = "mock_request"))]
+fn mock_request(buf: Vec<u8>, _: &usize) -> Vec<u8> {
+    buf
+}
+#[cfg(feature = "mock_request")]
+fn mock_request(buf: Vec<u8>, amt: &usize) -> Vec<u8> {
+    if amt >= &14 {
+        return buf
+    }
+
     debug!("mocking request because length < 14");
     let mut b = Builder::new_query(0, false);
     b.add_question("google.com", QueryType::A, QueryClass::Any);
@@ -72,32 +72,34 @@ fn parse_packet(config: Arc<Config>, socket: UdpSocket, src_addr: SocketAddr, bu
 }
 
 fn make_request(config: Arc<Config>, rs: Source, packet: Packet) {
-    //build_response
-    // let addr = "127.0.0.1:6142".parse().unwrap();
-    // let stream = addr.connect_async::<tokio_tls::TlsStream>();
-
     let qtype = packet.questions[0].qtype as u16;
     let qname = packet.questions[0].qname.to_string();
     info!("requested name:{}, type:{}", qname, qtype);
-
 
     let connector = TlsConnector::builder().unwrap().build().unwrap();
 
     let addr = config.resolver.get_addr();
     let domain = config.resolver.get_domain();
 
-    let stream = TcpStream::connect(addr).unwrap();
-    let mut stream = connector.connect(domain, stream).unwrap();
+    match TcpStream::connect(addr) {
+        Ok(tcp_stream) => {
+            match connector.connect(domain, tcp_stream) {
+                Ok(mut tls_stream) => {
+                    let request = config.resolver.get_request(qtype, &qname);
 
-    let url = config.resolver.get_url(qtype, &qname);
+                    tls_stream.write_all(request.as_str().as_bytes()).unwrap();
+                    let mut res = vec![];
+                    tls_stream.read_to_end(&mut res).unwrap();
+                    println!("{}", String::from_utf8_lossy(&res));
 
-    stream.write_all(b"GET / HTTP/1.0\r\n\r\n").unwrap();
-    let mut res = vec![];
-    stream.read_to_end(&mut res).unwrap();
-    println!("{}", String::from_utf8_lossy(&res));
-
-    let buf = vec![0;1500];
-    send_response(rs, buf);
+                    let buf = vec![0;1500];
+                    send_response(rs, buf);
+                },
+                Err(err) => { error!("tls connection failed {:?}", err);}
+            }
+        },
+        Err(err) => { error!("tcp connection failed {:?}", err);}
+    }
 }
 
 // fn build_response(rs: Source, packet: Packet, deserialized: Request) {
