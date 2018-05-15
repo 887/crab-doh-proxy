@@ -61,6 +61,9 @@ fn main() -> std::io::Result<()> {
     mock_request::mock_request()
 }
 
+//use dig to test
+//dig @127.0.0.1 -p 6142 www.example.com
+
 #[cfg(not(feature = "mock_request"))]
 fn main() -> std::io::Result<()> {
     simple_logger::init_with_level(log::Level::Debug).unwrap();
