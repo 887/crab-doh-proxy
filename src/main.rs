@@ -48,6 +48,8 @@ use tokio::net::TcpStream;
 use tokio::reactor::Handle;
 use tokio::runtime::Runtime;
 
+//TODO: maybe one day use future threadpool once tokio caught up to it
+//https://github.com/rust-lang-nursery/futures-rs/blob/master/futures-executor/src/thread_pool.rs
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use log::{SetLoggerError, LevelFilter};
