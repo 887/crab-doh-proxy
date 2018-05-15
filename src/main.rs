@@ -23,6 +23,10 @@ extern crate env_logger;
 
 extern crate native_tls;
 
+extern crate h2;
+extern crate http;
+extern crate httparse;
+
 mod dns;
 mod request;
 mod resolver;

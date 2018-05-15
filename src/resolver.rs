@@ -2,6 +2,8 @@ use std::io::{self, Write};
 use std::net::{SocketAddr, UdpSocket};
 use std::env;
 
+use http::Request;
+
 pub enum Resolver {
     //cloudlfare, also needs the content-type header for application/dns-json
     //"1.1.1.1" ,1.0.0.1, dns.cloudflare.com
@@ -37,6 +39,13 @@ impl Resolver {
         match self {
             Resolver::Cloudflare() => {"1.1.1.1"},
             Resolver::Google() => {"dns.google.com"}
+        }
+    }
+
+    pub fn use_http2(&self) -> bool {
+        match self {
+            Resolver::Cloudflare() => {true},
+            Resolver::Google() => {true}
         }
     }
 
@@ -84,6 +93,14 @@ impl Resolver {
                 self.get_additional_params(),
                 self.get_domain(),
                 self.get_headers())
+
+        //TODO: use http lib to build the request here
+            // Request::builder()
+            // .uri("https://www.rust-lang.org/")
+            // .header("User-Agent", "awesome/1.0")
+            // .body(())
+            // .unwrap()
+
     }
 }
 
