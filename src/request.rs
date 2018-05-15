@@ -10,68 +10,43 @@ use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Ty
 
 use native_tls::TlsConnector;
 
+#[cfg(not(feature = "mock_request"))]
 use server::Server;
 use config::Config;
 
-struct Source {
-    socket: UdpSocket,
-    src_addr: SocketAddr,
+pub struct RequestSource {
+    pub socket: UdpSocket,
+    pub addr: SocketAddr,
 }
 
-pub fn handle_request(server: &mut Server, amt: usize, src_addr: SocketAddr) -> Result<(), io::Error> {
-    //only clone the bytes we really need
-    let mut buf = server.buf[..amt].to_vec().clone();
-    let socket = server.socket.try_clone()?;
-    let config = server.config.clone();
-    server.threadpool.install(move || {
-        buf = mock_request(buf, &amt);
-
-        parse_packet(config, socket, src_addr, buf, amt);
-    });
-
-    Ok(())
+pub struct WorkerResources {
+    pub config: Arc<Config>,
+    pub src: RequestSource,
+    pub buf: Vec<u8>,
+    pub amt: usize,
 }
 
-#[cfg(not(feature = "mock_request"))]
-fn mock_request(buf: Vec<u8>, _: &usize) -> Vec<u8> {
-    buf
-}
-#[cfg(feature = "mock_request")]
-fn mock_request(buf: Vec<u8>, amt: &usize) -> Vec<u8> {
-    if amt >= &14 {
-        return buf
-    }
-
-    debug!("mocking request because length < 14");
-    let mut b = Builder::new_query(0, false);
-    b.add_question("google.com", QueryType::A, QueryClass::Any);
-    match b.build() {
-        Ok(data) | Err(data) => data,
-    }
-}
-
-fn parse_packet(config: Arc<Config>, socket: UdpSocket, src_addr: SocketAddr, buf: Vec<u8>, amt: usize) {
+pub fn parse_packet(wr: WorkerResources) {
     //only print here in the thread, so we dont block stdio on the udp receiving thread
-    debug!("Received {} bytes from {}", amt, src_addr);
-    let rs = Source {socket: socket, src_addr: src_addr};
-
+    debug!("Received {} bytes from {}", wr.amt, wr.src.addr);
     // https://tailhook.github.io/dns-parser/dns_parser/struct.Packet.html
-    if let Ok(packet) = Packet::parse(&buf) {
+    if let Ok(packet) = Packet::parse(&wr.buf) {
         // only support one question
         // https://groups.google.com/forum/#!topic/comp.protocols.dns.bind/uOWxNkm7AVg
         if packet.questions.len() != 1 {
-            error!("Invalid request from {}, packet questions != 1 (amt: {})", rs.src_addr, packet.questions.len());
+            error!("Invalid request from {}, packet questions != 1 (amt: {})",
+                   wr.src.addr, packet.questions.len());
         } else {
             debug!("packet parsed!");
-            make_request(config, rs, packet);
+            make_request(wr.config, wr.src, packet);
             // handle_packet(config, cert, receiver, packet);
         }
     } else {
-        debug!("Invalid request from {}", rs.src_addr);
+        debug!("Invalid request from {}", wr.src.addr);
     }
 }
 
-fn make_request(config: Arc<Config>, rs: Source, packet: Packet) {
+fn make_request(config: Arc<Config>, rs: RequestSource, packet: Packet) {
     let qtype = packet.questions[0].qtype as u16;
     let qname = packet.questions[0].qname.to_string();
     info!("requested name:{}, type:{}", qname, qtype);
@@ -146,15 +121,14 @@ fn make_request(config: Arc<Config>, rs: Source, packet: Packet) {
 //         SocketSender::new((receiver, data)).boxed()
 // }
 
-fn send_response(rs: Source, buf: Vec<u8>) {
+fn send_response(rs: RequestSource, buf: Vec<u8>) {
     let amt = buf.len();
-    match rs.socket.send_to(&buf, &rs.src_addr) {
+    match rs.socket.send_to(&buf, &rs.addr) {
         Ok(_) => {
-            debug!("Echoed {:?}/{} bytes to {}", amt, amt, rs.src_addr);
+            debug!("Echoed {:?}/{} bytes to {}", amt, amt, rs.addr);
         }
         Err(_) => {
-            debug!("Failed to send {:?}/{} bytes to {}", amt, amt, rs.src_addr);
+            debug!("Failed to send {:?}/{} bytes to {}", amt, amt, rs.addr);
         }
     };
 }
-

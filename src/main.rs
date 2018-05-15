@@ -24,10 +24,13 @@ extern crate env_logger;
 extern crate native_tls;
 
 mod dns;
-mod server;
 mod request;
 mod resolver;
 mod config;
+#[cfg(feature = "mock_request")]
+mod mock_request;
+#[cfg(not(feature = "mock_request"))]
+mod server;
 
 use std::sync::Arc;
 
@@ -37,7 +40,6 @@ use std::env;
 use std::net::{SocketAddr, UdpSocket};
 
 use tokio::prelude::*;
-use tokio::net::UdpSocket as TokioUdpSocket;
 use tokio::net::TcpStream;
 use tokio::reactor::Handle;
 use tokio::runtime::Runtime;
@@ -46,39 +48,16 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use log::{SetLoggerError, LevelFilter};
 
-use server::Server;
+#[cfg(not(feature = "mock_request"))]
+use server::{Server, spawn_server};
 use config::Config;
 
-fn get_sockets(
-    adr: SocketAddr,
-    reactor_handle: &tokio::reactor::Handle,
-) -> std::io::Result<(UdpSocket, TokioUdpSocket)> {
-    let socket = std::net::UdpSocket::bind(adr)?;
-    let socket_for_later = socket.try_clone()?;
-    info!("Listening on: {}", socket.local_addr().unwrap());
-    let tokio_socket = TokioUdpSocket::from_std(socket, reactor_handle)?;
-    Ok((socket_for_later, tokio_socket))
+#[cfg(feature = "mock_request")]
+fn main() -> std::io::Result<()> {
+    mock_request::mock_request()
 }
 
-fn spawn_server (addr: &str, runtime: &mut Runtime,
-                 pool: Arc<ThreadPool>, config: Arc<Config>) -> std::io::Result<()> {
-
-    let addr = addr.parse().unwrap();
-    let (udp_socket, tokio_socket) = get_sockets(addr, runtime.reactor())?;
-    let server = Server {
-        config: config,
-        threadpool: pool,
-        tokio_socket: tokio_socket,
-        socket: udp_socket,
-        buf: vec![0; 1500],
-    };
-
-    let server = server.map_err(|e| error!("server error = {:?}", e));
-    runtime.spawn(server);
-
-    Ok(())
-}
-
+#[cfg(not(feature = "mock_request"))]
 fn main() -> std::io::Result<()> {
     simple_logger::init_with_level(log::Level::Debug).unwrap();
 
