@@ -8,7 +8,7 @@ use rayon::{ThreadPool};
 
 use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Type};
 
-use native_tls::TlsConnector;
+use native_tls::{TlsConnector, TlsStream};
 
 //use to build http2 connection
 use h2::client;
@@ -58,38 +58,44 @@ fn make_request(config: Arc<Config>, rs: RequestSource, packet: Packet) {
 
     match TcpStream::connect(addr) {
         Ok(tcp_stream) => {
-            if config.resolver.use_http2() {
-            } else {
-                let domain = config.resolver.get_domain();
-                connect_http1(&config, qtype, qname, rs, domain, tcp_stream);
-            }
+            connect_tls(&config, qtype, qname, rs, tcp_stream);
         },
         Err(err) => { error!("tcp connection failed {:?}", err);}
     }
 }
 
-fn connect_http1(config: &Arc<Config>, qtype: u16, qname: String,
-                 rs: RequestSource,  domain: &'static str, tcp_stream: TcpStream) {
+fn connect_tls(config: &Arc<Config>, qtype: u16, qname: String,
+                 rs: RequestSource, tcp_stream: TcpStream) {
+    let domain = config.resolver.get_domain();
     let connector = TlsConnector::builder().unwrap().build().unwrap();
     match connector.connect(domain, tcp_stream) {
-        Ok(mut tls_stream) => {
-            let request = config.resolver.get_request(qtype, &qname);
-
-            tls_stream.write_all(request.as_str().as_bytes()).unwrap();
-            let mut res = vec![];
-            tls_stream.read_to_end(&mut res).unwrap();
-            println!("{}", String::from_utf8_lossy(&res));
-
-            //TODO: parse the http request (let try the http parser hyper uses, maybe?)
-            //TODO: put it into json via serde
-            //TODO: build a response with build_response to the packet and send it with
-            //      send_response
-
-            let buf = vec![0;1500];
-            send_response(rs, buf);
+        Ok(tls_stream) => {
+            run_request(config, qtype, qname, rs, tls_stream);
         },
         Err(err) => { error!("tls connection failed {:?}", err);}
     }
+}
+
+fn run_request(config: &Arc<Config>, qtype: u16, qname: String,
+               rs: RequestSource, mut tls_stream: TlsStream<TcpStream>) {
+    let request = config.resolver.get_request(qtype, &qname);
+
+    tls_stream.write_all(request.as_str().as_bytes()).unwrap();
+    let mut res = vec![];
+    tls_stream.read_to_end(&mut res).unwrap();
+    println!("{}", String::from_utf8_lossy(&res));
+
+    //TODO: use to parse http request result
+    use httparse::Response;
+
+    //TODO: parse the http request (let try the http parser hyper uses, maybe?)
+    //TODO: put it into json via serde
+    //TODO: build a response with build_response to the packet and send it with
+    //      send_response
+
+    let buf = vec![0;1500];
+    send_response(rs, buf);
+
 }
 
 // fn build_response(rs: Source, packet: Packet, deserialized: Request) {

@@ -42,13 +42,6 @@ impl Resolver {
         }
     }
 
-    pub fn use_http2(&self) -> bool {
-        match self {
-            Resolver::Cloudflare() => {true},
-            Resolver::Google() => {true}
-        }
-    }
-
     pub fn get_dir(&self) -> &'static str {
         match self {
             Resolver::Cloudflare() => {"/dns-query"},
