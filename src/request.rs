@@ -10,8 +10,6 @@ use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Ty
 
 use native_tls::{TlsConnector, TlsStream};
 
-//use to build http2 connection
-use h2::client;
 //TODO: use to parse http request result
 use httparse::Response;
 

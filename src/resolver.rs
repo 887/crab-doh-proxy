@@ -2,8 +2,6 @@ use std::io::{self, Write};
 use std::net::{SocketAddr, UdpSocket};
 use std::env;
 
-use http::Request;
-
 pub enum Resolver {
     //cloudlfare, also needs the content-type header for application/dns-json
     //"1.1.1.1" ,1.0.0.1, dns.cloudflare.com
@@ -88,11 +86,11 @@ impl Resolver {
                 self.get_headers())
 
         //TODO: use http lib to build the request here
-            // Request::builder()
-            // .uri("https://www.rust-lang.org/")
-            // .header("User-Agent", "awesome/1.0")
-            // .body(())
-            // .unwrap()
+        // Request::builder()
+        // .uri("https:///")
+        // .header("User-Agent", "awesome/1.0")
+        // .body(())
+        // .unwrap().to_string()
 
     }
 }

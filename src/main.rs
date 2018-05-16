@@ -12,6 +12,8 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
+//TODO: maybe one day use future threadpool, once tokio caught up to it
+//https://github.com/rust-lang-nursery/futures-rs/blob/master/futures-executor/src/thread_pool.rs
 extern crate rayon;
 
 extern crate dns_parser;
@@ -21,10 +23,9 @@ extern crate simple_logger;
 extern crate log;
 extern crate env_logger;
 
+//TODO: lookup how to build native-tls with rust-tls backed enforced
 extern crate native_tls;
 
-extern crate h2;
-extern crate http;
 extern crate httparse;
 
 mod dns;
@@ -48,8 +49,6 @@ use tokio::net::TcpStream;
 use tokio::reactor::Handle;
 use tokio::runtime::Runtime;
 
-//TODO: maybe one day use future threadpool once tokio caught up to it
-//https://github.com/rust-lang-nursery/futures-rs/blob/master/futures-executor/src/thread_pool.rs
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use log::{SetLoggerError, LevelFilter};
