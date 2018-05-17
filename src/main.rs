@@ -59,6 +59,8 @@ use config::Config;
 
 #[cfg(feature = "mock_request")]
 fn main() -> std::io::Result<()> {
+    simple_logger::init_with_level(log::Level::Trace).unwrap();
+
     mock_request::mock_request()
 }
 

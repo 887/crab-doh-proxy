@@ -10,10 +10,11 @@ use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Ty
 
 use native_tls::{TlsConnector, TlsStream};
 
-//TODO: use to parse http request result
-use httparse::Response;
-
 use config::Config;
+
+use dns::*;
+
+use serde_json::from_str as serde_json_from_str;
 
 pub struct RequestSource {
     pub socket: UdpSocket,
@@ -54,8 +55,10 @@ fn make_request(config: Arc<Config>, rs: RequestSource, packet: Packet) {
 
     let addr = config.resolver.get_addr();
 
+    trace!("connecting to {}", addr);
     match TcpStream::connect(addr) {
         Ok(tcp_stream) => {
+            trace!("connection established");
             connect_tls(&config, qtype, qname, rs, tcp_stream);
         },
         Err(err) => { error!("tcp connection failed {:?}", err);}
@@ -66,8 +69,10 @@ fn connect_tls(config: &Arc<Config>, qtype: u16, qname: String,
                  rs: RequestSource, tcp_stream: TcpStream) {
     let domain = config.resolver.get_domain();
     let connector = TlsConnector::builder().unwrap().build().unwrap();
+    trace!("upgrading to tls");
     match connector.connect(domain, tcp_stream) {
         Ok(tls_stream) => {
+            trace!("upgrade success");
             run_request(config, qtype, qname, rs, tls_stream);
         },
         Err(err) => { error!("tls connection failed {:?}", err);}
@@ -76,24 +81,60 @@ fn connect_tls(config: &Arc<Config>, qtype: u16, qname: String,
 
 fn run_request(config: &Arc<Config>, qtype: u16, qname: String,
                rs: RequestSource, mut tls_stream: TlsStream<TcpStream>) {
+    use httparse::{Response, EMPTY_HEADER, Status};
+
     let request = config.resolver.get_request(qtype, &qname);
 
+    trace!("writing data");
     tls_stream.write_all(request.as_str().as_bytes()).unwrap();
     let mut res = vec![];
     tls_stream.read_to_end(&mut res).unwrap();
-    println!("{}", String::from_utf8_lossy(&res));
 
-    //TODO: use to parse http request result
-    use httparse::Response;
+    trace!("data read");
+    let mut headers = [EMPTY_HEADER; 16];
+    let mut response = Response::new(&mut headers);
 
-    //TODO: parse the http request (let try the http parser hyper uses, maybe?)
-    //TODO: put it into json via serde
-    //TODO: build a response with build_response to the packet and send it with
-    //      send_response
+    match response.parse(&res) {
+        Ok(response_status) => {
+            match response.code {
+                Some(code) => {
+                    if code == 200 {
+                        match response_status {
+                            Status::Complete(header_length) => {
+                                let body = res[header_length..].to_vec();
+                                parse_response_body(config, rs, &body);
+                            },
+                            incomplete => {
+                                 error!("incomplete response {:?}", incomplete);
+                            }
+                        }
+                    } else {
+                        error!("response code = {:?}", code);
+                    }
+                },
+                None => {
+                    error!("no response code");
+                }
+            }
+        },
+        Err(err) => {
+            error!("parsing response failed {:?}", err);
+        },
+    }
+}
 
-    let buf = vec![0;1500];
-    send_response(rs, buf);
+fn parse_response_body(config: &Arc<Config>, rs: RequestSource, res_body: &Vec<u8>) {
+    let res_body_string = String::from_utf8_lossy(&res_body);
+    trace!("response string: {}", res_body_string);
 
+    if let Ok(deserialized) = serde_json_from_str::<DnsRequest>(&res_body_string) {
+        trace!("response json deserialized: {:?}", deserialized);
+        //build_response(receiver, packet, deserialized)
+        let buf = vec![0;1500];
+        send_response(rs, buf);
+    } else {
+        error!("couldn't deserialize json");
+    }
 }
 
 // fn build_response(rs: Source, packet: Packet, deserialized: Request) {

@@ -31,7 +31,7 @@ pub struct Authority {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Request {
+pub struct DnsRequest {
     #[serde(rename = "Status")]
     pub status: u32,
     #[serde(rename = "TC")]

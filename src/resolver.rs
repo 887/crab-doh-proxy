@@ -84,14 +84,6 @@ impl Resolver {
                 self.get_additional_params(),
                 self.get_domain(),
                 self.get_headers())
-
-        //TODO: use http lib to build the request here
-        // Request::builder()
-        // .uri("https:///")
-        // .header("User-Agent", "awesome/1.0")
-        // .body(())
-        // .unwrap().to_string()
-
     }
 }
 
