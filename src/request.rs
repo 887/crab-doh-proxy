@@ -57,7 +57,6 @@ pub fn parse_packet(wr: WorkerResources) {
                     packet: packet,
                 },
             );
-            // handle_packet(config, cert, receiver, packet);
         }
     } else {
         debug!("Invalid request from {}", wr.src.addr);
