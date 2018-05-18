@@ -6,7 +6,7 @@ use std::env;
 
 use rayon::ThreadPool;
 
-use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Type};
+use dns_parser::{Builder, Class, Header, Opcode, Packet, QueryClass, QueryType, ResponseCode, Type};
 
 use native_tls::{TlsConnector, TlsStream};
 
@@ -15,6 +15,8 @@ use config::Config;
 use dns::*;
 
 use serde_json::from_str as serde_json_from_str;
+
+use dns_response_builder::{remove_fqdn_dot, ResponseBuilder};
 
 pub struct RequestSource {
     pub socket: UdpSocket,
@@ -26,6 +28,11 @@ pub struct WorkerResources {
     pub src: RequestSource,
     pub buf: Vec<u8>,
     pub amt: usize,
+}
+
+struct RequestSourceAndPacket<'a> {
+    src: RequestSource,
+    packet: Packet<'a>,
 }
 
 pub fn parse_packet(wr: WorkerResources) {
@@ -43,7 +50,13 @@ pub fn parse_packet(wr: WorkerResources) {
             );
         } else {
             debug!("packet parsed!");
-            make_request(wr.config, wr.src, packet);
+            make_request(
+                wr.config,
+                RequestSourceAndPacket {
+                    src: wr.src,
+                    packet: packet,
+                },
+            );
             // handle_packet(config, cert, receiver, packet);
         }
     } else {
@@ -51,10 +64,11 @@ pub fn parse_packet(wr: WorkerResources) {
     }
 }
 
-fn make_request(config: Arc<Config>, rs: RequestSource, packet: Packet) {
-    let qtype = packet.questions[0].qtype as u16;
-    let qname = packet.questions[0].qname.to_string();
-    info!("requested name:{}, type:{}", qname, qtype);
+fn make_request(config: Arc<Config>, rs: RequestSourceAndPacket) {
+    let qtype = rs.packet.questions[0].qtype as u16;
+    let qname = rs.packet.questions[0].qname.to_string();
+    let id = rs.packet.header.id;
+    debug!("requested id:{} name:{}, type:{}", id, qname, qtype);
 
     let addr = config.resolver.get_addr();
 
@@ -74,7 +88,7 @@ fn connect_tls(
     config: &Arc<Config>,
     qtype: u16,
     qname: String,
-    rs: RequestSource,
+    rs: RequestSourceAndPacket,
     tcp_stream: TcpStream,
 ) {
     let domain = config.resolver.get_domain();
@@ -95,7 +109,7 @@ fn run_request(
     config: &Arc<Config>,
     qtype: u16,
     qname: String,
-    rs: RequestSource,
+    rs: RequestSourceAndPacket,
     mut tls_stream: TlsStream<TcpStream>,
 ) {
     use httparse::{Response, Status, EMPTY_HEADER};
@@ -138,67 +152,74 @@ fn run_request(
     }
 }
 
-fn parse_response_body(config: &Arc<Config>, rs: RequestSource, res_body: &Vec<u8>) {
+fn parse_response_body(config: &Arc<Config>, rs: RequestSourceAndPacket, res_body: &Vec<u8>) {
     let res_body_string = String::from_utf8_lossy(&res_body);
     trace!("response string: {}", res_body_string);
 
     if let Ok(deserialized) = serde_json_from_str::<DnsRequest>(&res_body_string) {
         trace!("response json deserialized: {:?}", deserialized);
-        //build_response(receiver, packet, deserialized)
-        let buf = vec![0; 1500];
-        send_response(rs, buf);
+        build_response(config, rs, deserialized)
     } else {
         error!("couldn't deserialize json");
     }
 }
 
-// fn build_response(rs: Source, packet: Packet, deserialized: Request) {
-//
-//         // apparently this part was already done:
-//         // https://github.com/gmosley/rust-DNSoverHTTPS
-//         // https://david-cao.github.io/rustdocs/dns_parser/
-//
-//         // the only reason to keep the incoming packet around is this id, maybe drop the rest?
-//         let mut response = Builder::new_response(packet.id,
-//                                                  ResponseCode::NoError,
-//                                                  deserialized.tc,
-//                                                  deserialized.rd,
-//                                                  deserialized.ra);
-//
-//         for question in deserialized.questions {
-//             let query_type = QueryType::parse(question.qtype).unwrap();
-//             response.add_question(&remove_fqdn_dot(&question.qname),
-//             query_type,
-//             QueryClass::IN);
-//         }
-//
-//         if let Some(answers) = deserialized.answers {
-//             for answer in answers {
-//                 if let Ok(data) = answer.write() {
-//                     response.add_answer(&remove_fqdn_dot(&answer.aname),
-//                     Type::parse(answer.atype).unwrap(),
-//                     Class::IN,
-//                     answer.ttl,
-//                     data);
-//                 }
-//             }
-//         }
-//
-//         let data = match response.build() {
-//             Ok(data) | Err(data) => data,
-//         };
-//
-//         SocketSender::new((receiver, data)).boxed()
-// }
+fn build_response(config: &Arc<Config>, rs: RequestSourceAndPacket, deserialized: DnsRequest) {
+    let id = rs.packet.header.id;
+    let qtype = rs.packet.questions[0].qtype as u16;
+    let qname = rs.packet.questions[0].qname.to_string();
+
+    let mut response = ResponseBuilder::new_response(
+        id,
+        ResponseCode::NoError,
+        deserialized.tc,
+        deserialized.rd,
+        deserialized.ra,
+    );
+
+    for question in deserialized.questions {
+        let query_type = QueryType::parse(question.qtype).unwrap();
+        response.add_question(
+            &remove_fqdn_dot(&question.qname),
+            query_type,
+            QueryClass::IN,
+        );
+    }
+
+    info!(
+        "requested id:{} name:{}, type:{}, response: {:?}",
+        rs.packet.header.id, qname, qtype, deserialized.answers
+    );
+
+    if let Some(answers) = deserialized.answers {
+        for answer in answers {
+            if let Ok(data) = answer.write() {
+                response.add_answer(
+                    &remove_fqdn_dot(&answer.aname),
+                    Type::parse(answer.atype).unwrap(),
+                    Class::IN,
+                    answer.ttl,
+                    data,
+                );
+            }
+        }
+    }
+
+    let data = match response.build() {
+        Ok(data) | Err(data) => data,
+    };
+
+    send_response(rs.src, data);
+}
 
 fn send_response(rs: RequestSource, buf: Vec<u8>) {
     let amt = buf.len();
     match rs.socket.send_to(&buf, &rs.addr) {
         Ok(_) => {
-            debug!("Echoed {:?}/{} bytes to {}", amt, amt, rs.addr);
+            debug!("Responded with {:?} bytes to {}", amt, rs.addr);
         }
         Err(_) => {
-            debug!("Failed to send {:?}/{} bytes to {}", amt, amt, rs.addr);
+            error!("Failed to send {:?} bytes to {}", amt, rs.addr);
         }
     };
 }

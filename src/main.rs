@@ -26,6 +26,8 @@ extern crate simple_logger;
 //TODO: lookup how to build native-tls with rust-tls backed enforced
 extern crate native_tls;
 
+extern crate byteorder;
+
 extern crate httparse;
 
 mod dns;
@@ -36,6 +38,7 @@ mod config;
 mod mock_request;
 #[cfg(not(feature = "mock_request"))]
 mod server;
+mod dns_response_builder;
 
 use std::sync::Arc;
 

@@ -3,6 +3,7 @@ authors = ["887 <2300887@gmail.com>"]
 name = "crab-doh-proxy"
 version = "0.1.0"
 [dependencies]
+byteorder = "1.2.3"
 clap = "2.31.2"
 dns-parser = "0.7.1"
 env_logger = "0.5.10"
