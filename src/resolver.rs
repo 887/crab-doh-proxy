@@ -23,10 +23,10 @@ impl Resolver {
 
     pub fn get_addr(&self) -> &'static str {
         match self {
-            Resolver::Cloudflare() => {"1.1.1.1:443"},
-            Resolver::Google() => {"216.58.195.78:443"}
-            // Resolver::Google() => {"dns.google.com:443"} // this requires the proxy not to be
-            // its own dns server
+            Resolver::Cloudflare() => "1.1.1.1:443",
+            Resolver::Google() => "216.58.195.78:443",
+            // this requires the proxy not to be its own dns server
+            // Resolver::Google() => {"dns.google.com:443"}
         }
     }
 
@@ -35,15 +35,15 @@ impl Resolver {
     /// validation.
     pub fn get_domain(&self) -> &'static str {
         match self {
-            Resolver::Cloudflare() => {"1.1.1.1"},
-            Resolver::Google() => {"dns.google.com"}
+            Resolver::Cloudflare() => "1.1.1.1",
+            Resolver::Google() => "dns.google.com",
         }
     }
 
     pub fn get_dir(&self) -> &'static str {
         match self {
-            Resolver::Cloudflare() => {"/dns-query"},
-            Resolver::Google() => {"/resolve"}
+            Resolver::Cloudflare() => "/dns-query",
+            Resolver::Google() => "/resolve",
         }
     }
 
@@ -51,9 +51,8 @@ impl Resolver {
         match self {
             //TODO: parse from packet
             //&edns_client_subnet = edns
-
-            Resolver::Cloudflare() => {"&dnssec=true&ct=application/dns-json"},
-            Resolver::Google() => {"&dnssec=true"}
+            Resolver::Cloudflare() => "&dnssec=true&ct=application/dns-json",
+            Resolver::Google() => "&dnssec=true",
         }
     }
 
@@ -62,8 +61,8 @@ impl Resolver {
         match self {
             //TODO: insert a random header here to pad the request and
             // \r\nPadding: random_string_on_every_request
-            Resolver::Cloudflare() => {""},
-            Resolver::Google() => {""}
+            Resolver::Cloudflare() => "",
+            Resolver::Google() => "",
         }
     }
 
@@ -76,15 +75,15 @@ impl Resolver {
     }
 
     pub fn get_request(&self, _type: u16, name: &str) -> String {
-        format!("GET {}?name={}&type={}{} HTTP/1.0\r\nHost: \
-                {}{}\r\n\r\n",
-                self.get_dir(),
-                name,
-                _type,
-                self.get_additional_params(),
-                self.get_domain(),
-                self.get_headers())
+        format!(
+            "GET {}?name={}&type={}{} HTTP/1.0\r\nHost: \
+             {}{}\r\n\r\n",
+            self.get_dir(),
+            name,
+            _type,
+            self.get_additional_params(),
+            self.get_domain(),
+            self.get_headers()
+        )
     }
 }
-
-

@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use std::io::{self, Read, Write};
-use std::net::{SocketAddr, UdpSocket, TcpStream};
+use std::net::{SocketAddr, TcpStream, UdpSocket};
 use std::env;
 
-use rayon::{ThreadPool};
+use rayon::ThreadPool;
 
 use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Type};
 
@@ -36,8 +36,11 @@ pub fn parse_packet(wr: WorkerResources) {
         // only support one question
         // https://groups.google.com/forum/#!topic/comp.protocols.dns.bind/uOWxNkm7AVg
         if packet.questions.len() != 1 {
-            error!("Invalid request from {}, packet questions != 1 (amt: {})",
-                   wr.src.addr, packet.questions.len());
+            error!(
+                "Invalid request from {}, packet questions != 1 (amt: {})",
+                wr.src.addr,
+                packet.questions.len()
+            );
         } else {
             debug!("packet parsed!");
             make_request(wr.config, wr.src, packet);
@@ -60,13 +63,20 @@ fn make_request(config: Arc<Config>, rs: RequestSource, packet: Packet) {
         Ok(tcp_stream) => {
             trace!("connection established");
             connect_tls(&config, qtype, qname, rs, tcp_stream);
-        },
-        Err(err) => { error!("tcp connection failed {:?}", err);}
+        }
+        Err(err) => {
+            error!("tcp connection failed {:?}", err);
+        }
     }
 }
 
-fn connect_tls(config: &Arc<Config>, qtype: u16, qname: String,
-                 rs: RequestSource, tcp_stream: TcpStream) {
+fn connect_tls(
+    config: &Arc<Config>,
+    qtype: u16,
+    qname: String,
+    rs: RequestSource,
+    tcp_stream: TcpStream,
+) {
     let domain = config.resolver.get_domain();
     let connector = TlsConnector::builder().unwrap().build().unwrap();
     trace!("upgrading to tls");
@@ -74,14 +84,21 @@ fn connect_tls(config: &Arc<Config>, qtype: u16, qname: String,
         Ok(tls_stream) => {
             trace!("upgrade success");
             run_request(config, qtype, qname, rs, tls_stream);
-        },
-        Err(err) => { error!("tls connection failed {:?}", err);}
+        }
+        Err(err) => {
+            error!("tls connection failed {:?}", err);
+        }
     }
 }
 
-fn run_request(config: &Arc<Config>, qtype: u16, qname: String,
-               rs: RequestSource, mut tls_stream: TlsStream<TcpStream>) {
-    use httparse::{Response, EMPTY_HEADER, Status};
+fn run_request(
+    config: &Arc<Config>,
+    qtype: u16,
+    qname: String,
+    rs: RequestSource,
+    mut tls_stream: TlsStream<TcpStream>,
+) {
+    use httparse::{Response, Status, EMPTY_HEADER};
 
     let request = config.resolver.get_request(qtype, &qname);
 
@@ -95,31 +112,29 @@ fn run_request(config: &Arc<Config>, qtype: u16, qname: String,
     let mut response = Response::new(&mut headers);
 
     match response.parse(&res) {
-        Ok(response_status) => {
-            match response.code {
-                Some(code) => {
-                    if code == 200 {
-                        match response_status {
-                            Status::Complete(header_length) => {
-                                let body = res[header_length..].to_vec();
-                                parse_response_body(config, rs, &body);
-                            },
-                            incomplete => {
-                                 error!("incomplete response {:?}", incomplete);
-                            }
+        Ok(response_status) => match response.code {
+            Some(code) => {
+                if code == 200 {
+                    match response_status {
+                        Status::Complete(header_length) => {
+                            let body = res[header_length..].to_vec();
+                            parse_response_body(config, rs, &body);
                         }
-                    } else {
-                        error!("response code = {:?}", code);
+                        incomplete => {
+                            error!("incomplete response {:?}", incomplete);
+                        }
                     }
-                },
-                None => {
-                    error!("no response code");
+                } else {
+                    error!("response code = {:?}", code);
                 }
+            }
+            None => {
+                error!("no response code");
             }
         },
         Err(err) => {
             error!("parsing response failed {:?}", err);
-        },
+        }
     }
 }
 
@@ -130,7 +145,7 @@ fn parse_response_body(config: &Arc<Config>, rs: RequestSource, res_body: &Vec<u
     if let Ok(deserialized) = serde_json_from_str::<DnsRequest>(&res_body_string) {
         trace!("response json deserialized: {:?}", deserialized);
         //build_response(receiver, packet, deserialized)
-        let buf = vec![0;1500];
+        let buf = vec![0; 1500];
         send_response(rs, buf);
     } else {
         error!("couldn't deserialize json");

@@ -18,10 +18,10 @@ extern crate rayon;
 
 extern crate dns_parser;
 
-extern crate simple_logger;
+extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
+extern crate simple_logger;
 
 //TODO: lookup how to build native-tls with rust-tls backed enforced
 extern crate native_tls;
@@ -51,10 +51,10 @@ use tokio::runtime::Runtime;
 
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
-use log::{SetLoggerError, LevelFilter};
+use log::{LevelFilter, SetLoggerError};
 
 #[cfg(not(feature = "mock_request"))]
-use server::{Server, spawn_server};
+use server::{spawn_server, Server};
 use config::Config;
 
 #[cfg(feature = "mock_request")]
@@ -76,9 +76,9 @@ fn main() -> std::io::Result<()> {
     //TODO: make num-worker-threads an option read from the command line arguments via clap
     //0 causes the build to either use the cpu count or the RAYON_NUM_THREADS environment variable
     let pool = rayon::ThreadPoolBuilder::new()
-                .num_threads(0)
-                .build()
-                .unwrap();
+        .num_threads(0)
+        .build()
+        .unwrap();
     let pool = Arc::new(pool);
 
     //TODO: read a doh resolver target from clap, cloudflare as default and google as backup

@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
-use std::io::{self, Read, Write, Result as IoResult};
-use std::net::{SocketAddr, UdpSocket, TcpStream};
+use std::io::{self, Read, Result as IoResult, Write};
+use std::net::{SocketAddr, TcpStream, UdpSocket};
 use std::env;
 
 use dns_parser::{Builder, Class, Packet, QueryClass, QueryType, ResponseCode, Type};
 
 use config::Config;
 
-use request::{RequestSource, WorkerResources, parse_packet};
+use request::{parse_packet, RequestSource, WorkerResources};
 
 fn mock_query() -> Vec<u8> {
     let mut b = Builder::new_query(0, false);
@@ -27,7 +27,7 @@ pub fn mock_request() -> IoResult<()> {
         config: Arc::new(Config::init_google()),
         src: RequestSource {
             socket: socket,
-            addr: addr
+            addr: addr,
         },
         buf: buf,
         amt: amt,
@@ -35,5 +35,3 @@ pub fn mock_request() -> IoResult<()> {
     parse_packet(wr);
     Ok(())
 }
-
-
