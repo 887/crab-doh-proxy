@@ -4,31 +4,25 @@
 #![allow(dead_code)]
 //#![allow(unreachable_code)]
 
-#[macro_use]
-extern crate tokio;
-
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-
+#[macro_use]
+extern crate tokio;
 //TODO: maybe one day use future threadpool, once tokio caught up to it
 //https://github.com/rust-lang-nursery/futures-rs/blob/master/futures-executor/src/thread_pool.rs
-extern crate rayon;
-
 extern crate dns_parser;
-
 extern crate env_logger;
 #[macro_use]
 extern crate log;
+extern crate rayon;
 extern crate simple_logger;
-
 //TODO: lookup how to build native-tls with rust-tls backed enforced
-extern crate native_tls;
-
 extern crate byteorder;
-
+extern crate clap;
 extern crate httparse;
+extern crate native_tls;
 
 mod dns;
 mod request;
@@ -60,6 +54,8 @@ use log::{LevelFilter, SetLoggerError};
 use server::{spawn_server, Server};
 use config::Config;
 
+use clap::{App, Arg, SubCommand};
+
 #[cfg(feature = "mock_request")]
 fn main() -> std::io::Result<()> {
     simple_logger::init_with_level(log::Level::Trace).unwrap();
@@ -73,6 +69,20 @@ fn main() -> std::io::Result<()> {
 #[cfg(not(feature = "mock_request"))]
 fn main() -> std::io::Result<()> {
     simple_logger::init_with_level(log::Level::Debug).unwrap();
+
+    // TODO: build clap parameters
+    // let matches = App::new("Dns over Https proxy")
+    //     .version("1.0")
+    //     .author("887 <2300887@gmail.com>")
+    //     .about("Turns dns request into DNS over Https request to either cloudflare or google")
+    //     .arg(
+    //         Arg::with_name("backend")
+    //             .help("Sets the backend server to use (cloudflare when not specified)"),
+    //     )
+    //     .arg(Arg::with_name("listening_address").multiple(true).help(
+    //         "Sets the Listening Address(es), 127.0.0.1:6142 default. \
+    //          Can be specified multiple times.",
+    //     ));
 
     let mut runtime = Runtime::new().unwrap();
 

@@ -34,7 +34,7 @@ impl ResponseBuilder {
     ) -> ResponseBuilder {
         let mut buf = Vec::with_capacity(512);
         let head = Header {
-            id: id,
+            id,
             query: false,
             opcode: Opcode::StandardQuery,
             authoritative: true,
@@ -52,7 +52,7 @@ impl ResponseBuilder {
         buf.extend([0u8; 12].iter());
         head.write(&mut buf[..12]);
         ResponseBuilder {
-            buf: buf,
+            buf,
             labels: HashMap::new(),
         }
     }
@@ -118,7 +118,7 @@ impl ResponseBuilder {
     fn write_name(&mut self, name: &str) {
         if self.labels.contains_key(name) {
             // write offset to buffer
-            let offset = self.labels.get(name).unwrap();
+            let offset = self.labels[name];
             let pointer: u16 = offset | OFFSET_FLAG;
             self.buf.write_u16::<BigEndian>(pointer).unwrap();
         } else {

@@ -58,9 +58,9 @@ pub fn spawn_server(
     let addr = addr.parse().unwrap();
     let (udp_socket, tokio_socket) = get_sockets(addr, runtime.reactor())?;
     let server = Server {
-        config: config,
+        config,
         threadpool: pool,
-        tokio_socket: tokio_socket,
+        tokio_socket,
         socket: udp_socket,
         buf: vec![0; 1500],
     };
@@ -77,12 +77,12 @@ pub fn handle_request(server: &Server, amt: usize, src_addr: SocketAddr) {
             let wr = WorkerResources {
                 config: server.config.clone(),
                 src: RequestSource {
-                    socket: socket,
+                    socket,
                     addr: src_addr,
                 },
                 //only clone the bytes we really need
                 buf: server.buf[..amt].to_vec().clone(),
-                amt: amt,
+                amt,
             };
             spawn_work(server, wr);
         }

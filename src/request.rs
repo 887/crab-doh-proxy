@@ -51,10 +51,10 @@ pub fn parse_packet(wr: WorkerResources) {
         } else {
             debug!("packet parsed!");
             make_request(
-                wr.config,
-                RequestSourceAndPacket {
+                &wr.config,
+                &RequestSourceAndPacket {
                     src: wr.src,
-                    packet: packet,
+                    packet,
                 },
             );
         }
@@ -63,7 +63,7 @@ pub fn parse_packet(wr: WorkerResources) {
     }
 }
 
-fn make_request(config: Arc<Config>, rs: RequestSourceAndPacket) {
+fn make_request(config: &Arc<Config>, rs: &RequestSourceAndPacket) {
     let qtype = rs.packet.questions[0].qtype as u16;
     let qname = rs.packet.questions[0].qname.to_string();
     let id = rs.packet.header.id;
@@ -75,7 +75,7 @@ fn make_request(config: Arc<Config>, rs: RequestSourceAndPacket) {
     match TcpStream::connect(addr) {
         Ok(tcp_stream) => {
             trace!("connection established");
-            connect_tls(&config, qtype, qname, rs, tcp_stream);
+            connect_tls(&config, qtype, &qname, &rs, tcp_stream);
         }
         Err(err) => {
             error!("tcp connection failed {:?}", err);
@@ -86,8 +86,8 @@ fn make_request(config: Arc<Config>, rs: RequestSourceAndPacket) {
 fn connect_tls(
     config: &Arc<Config>,
     qtype: u16,
-    qname: String,
-    rs: RequestSourceAndPacket,
+    qname: &str,
+    rs: &RequestSourceAndPacket,
     tcp_stream: TcpStream,
 ) {
     let domain = config.resolver.get_domain();
@@ -96,7 +96,7 @@ fn connect_tls(
     match connector.connect(domain, tcp_stream) {
         Ok(tls_stream) => {
             trace!("upgrade success");
-            run_request(config, qtype, qname, rs, tls_stream);
+            run_request(config, qtype, qname, &rs, tls_stream);
         }
         Err(err) => {
             error!("tls connection failed {:?}", err);
@@ -107,8 +107,8 @@ fn connect_tls(
 fn run_request(
     config: &Arc<Config>,
     qtype: u16,
-    qname: String,
-    rs: RequestSourceAndPacket,
+    qname: &str,
+    rs: &RequestSourceAndPacket,
     mut tls_stream: TlsStream<TcpStream>,
 ) {
     use httparse::{Response, Status, EMPTY_HEADER};
@@ -131,7 +131,7 @@ fn run_request(
                     match response_status {
                         Status::Complete(header_length) => {
                             let body = res[header_length..].to_vec();
-                            parse_response_body(config, rs, &body);
+                            parse_response_body(config, &rs, &body);
                         }
                         incomplete => {
                             error!("incomplete response {:?}", incomplete);
@@ -151,19 +151,19 @@ fn run_request(
     }
 }
 
-fn parse_response_body(config: &Arc<Config>, rs: RequestSourceAndPacket, res_body: &Vec<u8>) {
+fn parse_response_body(config: &Arc<Config>, rs: &RequestSourceAndPacket, res_body: &[u8]) {
     let res_body_string = String::from_utf8_lossy(&res_body);
     trace!("response string: {}", res_body_string);
 
     if let Ok(deserialized) = serde_json_from_str::<DnsRequest>(&res_body_string) {
         trace!("response json deserialized: {:?}", deserialized);
-        build_response(config, rs, deserialized)
+        build_response(config, &rs, deserialized)
     } else {
         error!("couldn't deserialize json");
     }
 }
 
-fn build_response(config: &Arc<Config>, rs: RequestSourceAndPacket, deserialized: DnsRequest) {
+fn build_response(config: &Arc<Config>, rs: &RequestSourceAndPacket, deserialized: DnsRequest) {
     let id = rs.packet.header.id;
     let qtype = rs.packet.questions[0].qtype as u16;
     let qname = rs.packet.questions[0].qname.to_string();
@@ -208,10 +208,10 @@ fn build_response(config: &Arc<Config>, rs: RequestSourceAndPacket, deserialized
         Ok(data) | Err(data) => data,
     };
 
-    send_response(rs.src, data);
+    send_response(&rs.src, &data);
 }
 
-fn send_response(rs: RequestSource, buf: Vec<u8>) {
+fn send_response(rs: &RequestSource, buf: &[u8]) {
     let amt = buf.len();
     match rs.socket.send_to(&buf, &rs.addr) {
         Ok(_) => {
