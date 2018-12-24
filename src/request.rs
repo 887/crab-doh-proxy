@@ -91,7 +91,7 @@ fn connect_tls(
     tcp_stream: TcpStream,
 ) {
     let domain = config.resolver.get_domain();
-    let connector = TlsConnector::builder().unwrap().build().unwrap();
+    let connector = TlsConnector::builder().build().unwrap();
     trace!("upgrading to tls");
     match connector.connect(domain, tcp_stream) {
         Ok(tls_stream) => {
